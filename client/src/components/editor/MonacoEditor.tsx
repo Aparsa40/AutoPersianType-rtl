@@ -111,9 +111,11 @@ export function MonacoEditor() {
             ev.preventDefault();
             // insert at current selection
             const sel = editor.getSelection();
+            // ensure we pass a non-null IRange to satisfy monaco types
+            const range = sel ?? editor.getModel()?.getFullModelRange() ?? { startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1 };
             editor.executeEdits("paste", [
               {
-                range: sel || undefined,
+                range,
                 text,
                 forceMoveMarkers: true,
               },
