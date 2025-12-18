@@ -16,6 +16,9 @@ export function MonacoEditor() {
     setCharCount,
     setDetectedDirection,
     setHeadings,
+    previewScrollPercent,
+    setEditorScrollPercent,
+    setEditorCenterLine,
   } = useEditorStore();
 
   const handleEditorDidMount: OnMount = useCallback((editor, monaco) => {
@@ -69,6 +72,93 @@ export function MonacoEditor() {
       setCursorPosition(e.position.lineNumber, e.position.column);
     });
 
+    // Ensure right-click focuses editor and places the cursor where clicked so
+    // native context-menu actions like Paste target the editor (fixes paste via mouse)
+    try {
+      // focus + set position on mouse down (covers most browsers)
+      editor.onMouseDown((ev) => {
+        try {
+          if (ev.event.rightButton) {
+            editor.focus();
+            if (ev.target && ev.target.position) {
+              editor.setPosition(ev.target.position);
+            }
+          }
+        } catch (err) {
+          // ignore
+        }
+      });
+
+      // also handle the explicit contextmenu event to be extra robust
+      editor.onContextMenu((ev) => {
+        try {
+          editor.focus();
+          if (ev.target && ev.target.position) {
+            editor.setPosition(ev.target.position);
+          }
+        } catch (err) {
+          // ignore
+        }
+      });
+
+      // Listen for DOM paste events on the editor container so paste via
+      // the browser context menu reliably inserts into the editor in all envs.
+      const dom = editor.getDomNode();
+      const pasteHandler = (ev: ClipboardEvent) => {
+        try {
+          const text = ev.clipboardData?.getData("text/plain");
+          if (text) {
+            ev.preventDefault();
+            // insert at current selection
+            const sel = editor.getSelection();
+            editor.executeEdits("paste", [
+              {
+                range: sel || undefined,
+                text,
+                forceMoveMarkers: true,
+              },
+            ]);
+            editor.focus();
+          }
+        } catch (err) {
+          // ignore
+        }
+      };
+      if (dom) {
+        dom.addEventListener("paste", pasteHandler as any);
+        // remove listener on dispose
+        editor.onDidDispose(() => dom.removeEventListener("paste", pasteHandler as any));
+      }
+    } catch (err) {
+      // older monaco builds may not support onContextMenu/onMouseDown, safe to ignore
+    }
+
+    // sync editor -> preview scroll
+    editor.onDidScrollChange(() => {
+      try {
+        const top = editor.getScrollTop();
+        const height = editor.getScrollHeight();
+        const viewport = editor.getDomNode()?.clientHeight || 1;
+        const max = Math.max(0, height - viewport);
+        const percent = max > 0 ? top / max : 0;
+        setEditorScrollPercent(percent);
+
+        // compute visible center line and expose for precise preview sync
+        try {
+          const ranges = editor.getVisibleRanges();
+          if (ranges && ranges.length) {
+            const vr = ranges[0];
+            const centerLine = Math.round((vr.startLineNumber + vr.endLineNumber) / 2);
+            setEditorCenterLine(centerLine);
+          }
+        } catch (err) {
+          // ignore
+        }
+      } catch (err) {
+        // ignore
+      }
+    });
+
     editor.focus();
   }, [setCursorPosition]);
 
@@ -96,6 +186,29 @@ export function MonacoEditor() {
     setCharCount(countCharacters(content));
     setHeadings(extractHeadings(content));
   }, []);
+
+  // apply incoming preview scroll (preview -> editor sync)
+  const isSettingEditorScroll = useRef(false);
+  useEffect(() => {
+    if (!editorRef.current) return;
+    if (isSettingEditorScroll.current) return;
+
+    const editor = editorRef.current;
+    try {
+      const viewportH = editor.getDomNode()?.clientHeight || 1;
+      const totalH = editor.getScrollHeight();
+      const max = Math.max(0, totalH - viewportH);
+      const top = Math.max(0, Math.min(max, Math.round(previewScrollPercent * max)));
+      if (Math.abs(editor.getScrollTop() - top) > 2) {
+        isSettingEditorScroll.current = true;
+        editor.setScrollTop(top);
+        // release after next tick
+        setTimeout(() => (isSettingEditorScroll.current = false), 150);
+      }
+    } catch (err) {
+      // ignore
+    }
+  }, [previewScrollPercent]);
 
   const goToLine = useCallback((line: number) => {
     if (editorRef.current) {

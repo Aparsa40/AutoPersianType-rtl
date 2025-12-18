@@ -18,6 +18,18 @@ interface EditorState {
   charCount: number;
   detectedDirection: "ltr" | "rtl" | "mixed";
   isModified: boolean;
+
+  /* Scrolling sync state */
+  editorScrollPercent: number;
+  previewScrollPercent: number;
+  setEditorScrollPercent: (percent: number) => void;
+  setPreviewScrollPercent: (percent: number) => void;
+
+  /* precise center-line sync */
+  editorCenterLine: number;
+  previewCenterLine: number;
+  setEditorCenterLine: (line: number) => void;
+  setPreviewCenterLine: (line: number) => void;
   
   setContent: (content: string) => void;
   setTheme: (theme: Theme) => void;
@@ -122,6 +134,18 @@ export const useEditorStore = create<EditorState>()(
       setWordCount: (count) => set({ wordCount: count }),
       setCharCount: (count) => set({ charCount: count }),
       setDetectedDirection: (direction) => set({ detectedDirection: direction }),
+
+      /* scrolling */
+      editorScrollPercent: 0,
+      previewScrollPercent: 0,
+      setEditorScrollPercent: (percent: number) => set({ editorScrollPercent: percent }),
+      setPreviewScrollPercent: (percent: number) => set({ previewScrollPercent: percent }),
+
+      /* precise center-line sync */
+      editorCenterLine: 1,
+      previewCenterLine: 1,
+      setEditorCenterLine: (line: number) => set({ editorCenterLine: line }),
+      setPreviewCenterLine: (line: number) => set({ previewCenterLine: line }),
       
       newDocument: () => {
         const id = crypto.randomUUID();
@@ -176,6 +200,7 @@ export const useEditorStore = create<EditorState>()(
         showSidebar: state.showSidebar,
         showPreview: state.showPreview,
         content: state.content,
+        /* do not persist scroll/sync ephemeral UI state */
       }),
     }
   )

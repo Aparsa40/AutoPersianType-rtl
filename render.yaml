@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: autopersiantype-web
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: "npm ci && npm run build"
+    startCommand: "npm run start"
+    healthCheckPath: /api/health
+    autoDeploy: true

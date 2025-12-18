@@ -1,0 +1,16 @@
+<!-- markdownlint-disable MD023 MD025 MD001 -->
+
+# Require maintainers reviews for critical files
+
+ ## Update the GitHub usernames below to your actual maintainer/team handles
+
+ ## Protect server and build config
+
+/server/ @your-github-username
+/package.json @your-github-username
+drizzle.config.ts @your-github-username
+vite.config.ts @your-github-username
+
+ # General ownership for docs and src (optional)
+
+/client/ @your-github-username
