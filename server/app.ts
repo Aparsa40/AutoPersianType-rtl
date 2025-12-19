@@ -90,27 +90,22 @@ export default async function runApp(
     throw err;
   });
 
-  // setup نهایی (Vite / SSR / ...)
+  // setup نهایی (Vite / Static / SSR)
   await setup(app, server);
 
   /* -------------------- Listen -------------------- */
   const port = parseInt(process.env.PORT || "8080", 10);
-  const host = "127.0.0.1";
-  const isWindows = os.platform() === "win32";
 
-  server.listen(
-    {
-      port,
-      host,
-      ...(isWindows ? {} : { reusePort: true }),
-    },
-    async () => {
-      const url = `http://${host}:${port}`;
-      log(`Server running on ${url}`);
+  // 🔴 مهم‌ترین خط برای Render
+  const host = "0.0.0.0";
 
-      // باز کردن خودکار مرورگر
+  server.listen(port, host, async () => {
+    log(`Server running on http://${host}:${port}`);
+
+    // فقط در لوکال مرورگر باز شود
+    if (process.env.NODE_ENV !== "production") {
       try {
-        await open(url);
+        await open(`http://localhost:${port}`);
       } catch (err) {
         log(
           `Could not open browser automatically: ${
@@ -118,6 +113,6 @@ export default async function runApp(
           }`,
         );
       }
-    },
-  );
+    }
+  });
 }
