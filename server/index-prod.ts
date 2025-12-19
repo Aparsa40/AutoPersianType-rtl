@@ -8,7 +8,6 @@ import runApp from "./app";
  * Serve built client files in production
  */
 export async function serveStatic(app: Express, _server: Server) {
-  // dist/public ← دقیقا مطابق vite.config.ts
   const distPublicPath = path.resolve(
     import.meta.dirname,
     "..",
@@ -22,19 +21,18 @@ export async function serveStatic(app: Express, _server: Server) {
     );
   }
 
-  // Serve static assets
   app.use(
     express.static(distPublicPath, {
-      index: false, // خودمون کنترل index.html رو می‌گیریم
+      index: false,
     }),
   );
 
-  // SPA fallback (React / Router)
   app.use("*", (_req, res) => {
     res.sendFile(path.join(distPublicPath, "index.html"));
   });
 }
 
 (async () => {
+  // runApp فقط یک آرگومان می‌گیرد
   await runApp(serveStatic);
 })();
