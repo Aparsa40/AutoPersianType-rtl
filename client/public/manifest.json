@@ -1,6 +1,6 @@
 {
-  "name": "TypeWriterPro",
-  "short_name": "TypeWriterPro",
+  "name": "AutoPersianType",
+  "short_name": "AutoPersianType",
   "description": "A powerful markdown editor with live preview, workspaces, and document management",
   "start_url": "/",
   "scope": "/",

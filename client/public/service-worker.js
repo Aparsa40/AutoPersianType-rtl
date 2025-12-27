@@ -1,8 +1,8 @@
-// TypeWriterPro - Safe Production Service Worker
+// AutoPersianType - Safe Production Service Worker
 // Offline support + smart caching (no risky promises)
 
-const STATIC_CACHE = 'typewriterpro-static-v1';
-const RUNTIME_CACHE = 'typewriterpro-runtime-v1';
+const STATIC_CACHE = 'AutoPersianType-static-v1';
+const RUNTIME_CACHE = 'AutoPersianType-runtime-v1';
 
 // حداقلی و امن: فقط چیزهایی که قطعاً وجود دارند
 const STATIC_ASSETS = [
