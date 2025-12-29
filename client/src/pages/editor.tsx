@@ -4,6 +4,9 @@ import { MarkdownPreview } from "@/components/editor/MarkdownPreview";
 import { MenuBar } from "@/components/editor/MenuBar";
 import { SettingsPanel } from "@/components/editor/SettingsPanel";
 import { TableBuilder } from "@/components/editor/TableBuilder";
+import { CodeBlockBuilder } from "@/components/editor/CodeBlockBuilder";
+import { HeadingBuilder } from "@/components/editor/HeadingBuilder";
+import { ImageBuilder } from "@/components/editor/ImageBuilder";
 import { DocumentOutline } from "@/components/editor/DocumentOutline";
 import { StatusBar } from "@/components/editor/StatusBar";
 import { useEditorStore } from "@/lib/store";
@@ -91,6 +94,9 @@ export default function EditorPage() {
       <StatusBar />
       <SettingsPanel />
       <TableBuilder />
+      <CodeBlockBuilder />
+      <HeadingBuilder />
+      <ImageBuilder />
     </div>
   );
 }

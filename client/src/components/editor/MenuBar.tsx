@@ -19,6 +19,7 @@ import {
   Moon,
   Table2,
   List,
+  Image,
   Settings,
   FileDown,
 } from "lucide-react";
@@ -53,6 +54,9 @@ export function MenuBar() {
     togglePreview,
     toggleSettings,
     toggleTableBuilder,
+    toggleCodeBlockBuilder,
+    toggleHeadingBuilder,
+    toggleImageBuilder,
     newDocument,
     saveDocument,
   } = useEditorStore();
@@ -289,7 +293,7 @@ ${html}
       <div className="flex items-center gap-1">
         <div className="flex items-center gap-2 px-3">
           <FileText className="w-5 h-5 text-primary" />
-          <span className="font-semibold text-sm hidden sm:inline">TypeWriterPro</span>
+          <span className="font-semibold text-sm hidden sm:inline">AutoPersianType-Pro</span>
         </div>
         
         <DropdownMenu>
@@ -419,9 +423,24 @@ ${html}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuItem onClick={toggleHeadingBuilder} data-testid="menu-tools-heading">
+              <FileText className="mr-2 h-4 w-4" />
+              Insert Heading
+            </DropdownMenuItem>
+
+            <DropdownMenuItem onClick={toggleCodeBlockBuilder} data-testid="menu-tools-codeblock">
+              <FileCode className="mr-2 h-4 w-4" />
+              Insert Code Block
+            </DropdownMenuItem>
+
             <DropdownMenuItem onClick={toggleTableBuilder} data-testid="menu-tools-table">
               <Table2 className="mr-2 h-4 w-4" />
               Table Builder
+            </DropdownMenuItem>
+
+            <DropdownMenuItem onClick={toggleImageBuilder} data-testid="menu-tools-insert-image">
+              <Image className="mr-2 h-4 w-4" />
+              Insert Picture
             </DropdownMenuItem>
             <DropdownMenuItem onClick={toggleSidebar} data-testid="menu-tools-outline">
               <List className="mr-2 h-4 w-4" />

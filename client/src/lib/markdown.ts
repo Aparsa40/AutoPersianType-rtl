@@ -142,6 +142,26 @@ export function renderMarkdown(content: string, autoDirection: boolean = true): 
       // If DOMPurify isn't available, proceed with existing HTML (not ideal but fails safe)
     }
 
+    // Apply per-code-block font/size settings from wrapper divs (e.g., inserted by the CodeBlock dialog)
+    try {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      const blocks = tmp.querySelectorAll('div[data-code-font]');
+      blocks.forEach((block) => {
+        const fontName = block.getAttribute('data-code-font');
+        const fontSize = block.getAttribute('data-code-font-size');
+        const pre = block.querySelector('pre');
+        if (pre) {
+          if (fontName) pre.style.fontFamily = fontName;
+          if (fontSize) pre.style.fontSize = fontSize + 'px';
+          pre.classList.add('custom-code-block');
+        }
+      });
+      html = tmp.innerHTML;
+    } catch (e) {
+      // ignore any post-processing errors
+    }
+
     if (autoDirection && typeof document !== "undefined") {
       const out = addDirectionToElements(html, content);
       if (!out || out.trim() === "") {

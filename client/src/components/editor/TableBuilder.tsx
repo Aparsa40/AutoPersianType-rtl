@@ -82,7 +82,7 @@ export function TableBuilder() {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-6 py-4 max-h-[60vh] overflow-y-auto pr-2">
           <div className="flex items-center justify-center gap-4 mb-4">
             <Button
               variant={mode === "quick" ? "default" : "outline"}
@@ -173,7 +173,7 @@ export function TableBuilder() {
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="sticky bottom-0 bg-background pt-3 -mx-6 px-6 border-t">
           <Button variant="outline" onClick={toggleTableBuilder} data-testid="button-cancel">
             Cancel
           </Button>

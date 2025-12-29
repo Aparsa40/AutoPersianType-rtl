@@ -285,4 +285,37 @@
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
   }
-}
+  .image-block .resize-handle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: white;
+    border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 2px;
+    right: -6px;
+    bottom: -6px;
+    cursor: se-resize;
+    z-index: 10;
+  }
+
+  .image-context-menu {
+    position: fixed;
+    z-index: 9999;
+    background: var(--background);
+    border: 1px solid rgba(0,0,0,0.08);
+    padding: 6px 8px;
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  }
+
+  .image-context-menu button {
+    background: transparent;
+    border: none;
+    padding: 6px 8px;
+    width: 100%;
+    text-align: left;
+  }
+
+  .image-block[data-bg-removed="true"] img{
+    filter: grayscale(100%) contrast(110%);
+  }}
