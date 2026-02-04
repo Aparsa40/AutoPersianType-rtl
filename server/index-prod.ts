@@ -8,27 +8,23 @@ import runApp from "./app";
  * Serve built client files in production
  */
 export async function serveStatic(app: Express, _server: Server) {
-  const distPublicPath = path.resolve(
-    import.meta.dirname,
-    "..",
-    "dist",
-    "public",
-  );
+  // مسیر خروجی Vite که در vite.config.ts تعریف شده (dist/)
+  const distPath = path.resolve(import.meta.dirname, "..", "dist");
 
-  if (!fs.existsSync(distPublicPath)) {
+  if (!fs.existsSync(distPath)) {
     throw new Error(
-      `Build output not found at ${distPublicPath}. Did you run vite build?`,
+      `Build output not found at ${distPath}. Did you run vite build?`,
     );
   }
 
   app.use(
-    express.static(distPublicPath, {
+    express.static(distPath, {
       index: false,
     }),
   );
 
   app.use("*", (_req, res) => {
-    res.sendFile(path.join(distPublicPath, "index.html"));
+    res.sendFile(path.join(distPath, "index.html"));
   });
 }
 
