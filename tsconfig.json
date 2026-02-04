@@ -12,9 +12,8 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
-    // Use Node module resolution for type-checking to avoid baseUrl deprecation warnings
-    "moduleResolution": "node",
-    "baseUrl": ".",
+    // Use Node module resolution for type-checking to avoid baseUrl deprecation
+    "moduleResolution": "bundler",
     "types": ["node", "vite/client"],
     "paths": {
       "@/*": ["./client/src/*"],

@@ -40,6 +40,7 @@ import {
 import { useEditorStore } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { renderMarkdown } from "@/lib/markdown";
+import { parseMarkdownFile } from "@/lib/markdownFile";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -50,12 +51,15 @@ export function MenuBar() {
     setTheme,
     showSidebar,
     showPreview,
+    pageSettings,
+    blocks,
+    uploadedFonts,
     toggleSidebar,
     togglePreview,
     toggleSettings,
+    togglePageSettings,
     toggleTableBuilder,
     toggleCodeBlockBuilder,
-    toggleHeadingBuilder,
     toggleImageBuilder,
     newDocument,
     saveDocument,
@@ -64,6 +68,15 @@ export function MenuBar() {
   const { toast } = useToast();
 
   const handleNew = useCallback(() => {
+    const state = useEditorStore.getState();
+    if (state.isModified) {
+      const res = confirm("شما تغییرات ذخیره‌نشده دارید. آیا می‌خواهید ذخیره کنید؟ (OK برای ذخیره، Cancel برای رد کردن)");
+      if (res) {
+        handleSave();
+      } else {
+        state.clearAutosave();
+      }
+    }
     newDocument();
     toast({
       title: "New Document",
@@ -79,7 +92,20 @@ export function MenuBar() {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
         const text = await file.text();
-        useEditorStore.getState().setContent(text);
+
+        const parsed = parseMarkdownFile(text);
+        if (parsed.pageSettings) {
+          useEditorStore.getState().setPageSettings(parsed.pageSettings);
+        }
+        useEditorStore.getState().setContent(parsed.content);
+
+        const state = useEditorStore.getState();
+        parsed.images.forEach((img) => {
+          if (!state.blocks.find((b) => b.id === img.id)) {
+            state.addBlock({ id: img.id, type: 'image', src: img.src, settings: { width: 400, height: undefined, x: 0, y: 0 } });
+          }
+        });
+
         toast({
           title: "File Opened",
           description: `Loaded: ${file.name}`,
@@ -89,30 +115,112 @@ export function MenuBar() {
     input.click();
   }, [toast]);
 
-  const handleSave = useCallback(() => {
-    saveDocument();
-    toast({
-      title: "Document Saved",
-      description: "Your changes have been saved locally.",
-    });
-  }, [saveDocument, toast]);
+  const handleIntro = useCallback(() => {
+    useEditorStore.getState().toggleIntro();
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    // Try saving via File System Access API first; otherwise fallback to download (Save As)
+    const doc = saveDocument();
+    const meta = `<!--PAGE_SETTINGS:${JSON.stringify(pageSettings)}-->`;
+    const imageMd = blocks
+      .filter((b) => b.type === "image")
+      .map((b) => `\n\n![image-${b.id}](${b.src})`)
+      .join("");
+    const final = `${meta}\n\n${content}${imageMd}`;
+
+    try {
+      if ((window as any).showSaveFilePicker) {
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: `${doc?.title || "document"}.md`,
+          types: [{ description: "Markdown", accept: { "text/markdown": [".md", ".markdown", ".txt"] } }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(final);
+        await writable.close();
+        useEditorStore.getState().clearAutosave();
+        toast({ title: "Saved to disk", description: "File written to your device." });
+        return;
+      }
+    } catch (err) {
+      // fallthrough to Save As
+    }
+
+    // fallback: download
+    handleSaveAs();
+  }, [content, pageSettings, blocks, toast, saveDocument]);
+
+  // Save only the raw markdown (no internal page meta) so it opens cleanly in other editors
+  const handleSaveMarkdown = useCallback(async () => {
+    const doc = saveDocument();
+    const imageMd = blocks
+      .filter((b) => b.type === "image")
+      .map((b) => `\n\n![image-${b.id}](${b.src})`)
+      .join("");
+    const final = `${content}${imageMd}`;
+
+    try {
+      if ((window as any).showSaveFilePicker) {
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: `${doc?.title || "document"}.md`,
+          types: [{ description: "Markdown", accept: { "text/markdown": [".md", ".markdown", ".txt"] } }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(final);
+        await writable.close();
+        useEditorStore.getState().clearAutosave();
+        toast({ title: "Saved Markdown", description: "Markdown file saved to your device." });
+        return;
+      }
+    } catch (err) {
+      // fallthrough to download
+    }
+
+    // fallback: download raw markdown
+    const blob = new Blob([final], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${doc?.title || "document"}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    useEditorStore.getState().clearAutosave();
+    toast({ title: "Saved Markdown", description: "Markdown file downloaded." });
+  }, [content, pageSettings, blocks, toast, saveDocument]);
 
   const handleSaveAs = useCallback(() => {
-    const blob = new Blob([content], { type: "text/markdown" });
+    const meta = `<!--PAGE_SETTINGS:${JSON.stringify(pageSettings)}-->`;
+    const imageMd = blocks
+      .filter((b) => b.type === "image")
+      .map((b) => `\n\n![image-${b.id}](${b.src})`)
+      .join("");
+    const final = `${meta}\n\n${content}${imageMd}`;
+
+    const blob = new Blob([final], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = "document.md";
     a.click();
     URL.revokeObjectURL(url);
+    // clear autosave since user saved to disk
+    useEditorStore.getState().clearAutosave();
     toast({
       title: "File Downloaded",
       description: "Markdown file has been downloaded.",
     });
-  }, [content, toast]);
+  }, [content, pageSettings, blocks, toast]);
 
   const handleExportMarkdown = useCallback(() => {
-    const blob = new Blob([content], { type: "text/markdown" });
+    const meta = `<!--PAGE_SETTINGS:${JSON.stringify(pageSettings)}-->`;
+    const imageMd = blocks
+      .filter((b) => b.type === "image")
+      .map((b) => `\n\n![image-${b.id}](${b.src})`)
+      .join("");
+    const final = `${meta}\n\n${content}${imageMd}`;
+
+    const blob = new Blob([final], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -123,26 +231,57 @@ export function MenuBar() {
       title: "Export Complete",
       description: "Markdown file exported successfully.",
     });
-  }, [content, toast]);
+  }, [content, pageSettings, blocks, toast]);
 
   const handleExportHTML = useCallback(() => {
     const html = renderMarkdown(content, true);
+    const blockHtml = blocks
+        .map((block) => {
+        if (block.type === "heading") {
+          const Tag = `h${block.settings.level || 1}`;
+          const blockFont = (block.settings.direction === 'rtl') ? (block.settings.fontFamilyFa || block.settings.fontFamily) : (block.settings.fontFamilyEn || block.settings.fontFamily);
+          return `<${Tag} style="font-family: ${blockFont || 'Vazirmatn'}; font-size: ${block.settings.fontSize}px; color: ${block.settings.color}; background-color: ${block.settings.background}; font-weight: ${block.settings.bold ? 'bold' : 'normal'}; font-style: ${block.settings.italic ? 'italic' : 'normal'}; text-align: ${block.settings.alignment || 'left'};">${block.content}</${Tag}>`;
+        }
+        if (block.type === "paragraph") {
+          const paraFont = (block.settings.direction === 'rtl') ? (block.settings.fontFamilyFa || block.settings.fontFamily) : (block.settings.fontFamilyEn || block.settings.fontFamily);
+          return `<p style="font-family: ${paraFont || 'Vazirmatn'}; font-size: ${block.settings.fontSize}px; color: ${block.settings.color}; background-color: ${block.settings.background}; font-weight: ${block.settings.bold ? 'bold' : 'normal'}; font-style: ${block.settings.italic ? 'italic' : 'normal'}; text-align: ${block.settings.alignment || 'left'};">${block.content}</p>`;
+        }
+        if (block.type === "image") {
+          const w = block.settings.width ? `${block.settings.width}px` : 'auto';
+          const h = block.settings.height ? `${block.settings.height}px` : 'auto';
+          return `<div class="image-block" data-block-id="${block.id}" style="width: ${w}; height: ${h}; display:inline-block;"><img src="${block.src}" style="width:100%; height:100%; object-fit:contain;"/></div>`;
+        }
+        return '';
+      })
+      .join("\n");
+
+    const fontFaces = uploadedFonts
+      .map((f) => `@font-face { font-family: '${f.family || f.name}'; src: url('${f.url}'); font-display: swap; }`)
+      .join("\n");
+
+    const padding = `${pageSettings.marginTop}px ${pageSettings.marginRight}px ${pageSettings.marginBottom}px ${pageSettings.marginLeft}px`;
+
+    const borderTop = pageSettings.border?.sides.includes('top') ? `${pageSettings.border.width}px ${pageSettings.border.style} ${pageSettings.border.color}` : 'none';
+    const borderBottom = pageSettings.border?.sides.includes('bottom') ? `${pageSettings.border.width}px ${pageSettings.border.style} ${pageSettings.border.color}` : 'none';
+    const borderLeft = pageSettings.border?.sides.includes('left') ? `${pageSettings.border.width}px ${pageSettings.border.style} ${pageSettings.border.color}` : 'none';
+    const borderRight = pageSettings.border?.sides.includes('right') ? `${pageSettings.border.width}px ${pageSettings.border.style} ${pageSettings.border.color}` : 'none';
+
     const fullHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Exported Document</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    ${fontFaces}
     body {
-      font-family: 'Inter', 'Vazirmatn', system-ui, sans-serif;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 2rem;
-      line-height: 1.7;
-      color: #1a1a1a;
+      font-family: '${pageSettings.fontFamilyEn || pageSettings.fontFamily}', '${pageSettings.fontFamilyFa || 'Vazirmatn'}', system-ui, sans-serif;
+      font-size: ${pageSettings.fontSize}px;
+      line-height: ${pageSettings.lineHeight};
+      color: ${pageSettings.color};
+      background: ${pageSettings.background || '#ffffff'};
     }
+    #page { max-width: 800px; margin: 0 auto; padding: ${padding}; box-sizing: border-box; border-top: ${borderTop}; border-bottom: ${borderBottom}; border-left: ${borderLeft}; border-right: ${borderRight}; }
     h1, h2, h3, h4, h5, h6 { font-weight: 600; margin-top: 1.5em; margin-bottom: 0.5em; }
     h1 { font-size: 2rem; }
     h2 { font-size: 1.5rem; }
@@ -156,10 +295,15 @@ export function MenuBar() {
     table { width: 100%; border-collapse: collapse; margin: 1em 0; }
     th, td { border: 1px solid #e0e0e0; padding: 0.5em 1em; text-align: left; }
     th { background: rgba(0,0,0,0.02); font-weight: 600; }
+    .image-block img { max-width: 100%; height: auto; border-radius: 8px; }
   </style>
 </head>
 <body>
-${html}
+  <!--ORIGINAL_MARKDOWN_BASE64:${btoa(unescape(encodeURIComponent(content)))}-->
+  <div id="page">
+    ${html}
+    ${blockHtml}
+  </div>
 </body>
 </html>`;
 
@@ -167,14 +311,20 @@ ${html}
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "document.html";
+    a.download = `${useEditorStore.getState().currentDocument?.title || 'document'}.html`;
     a.click();
     URL.revokeObjectURL(url);
     toast({
       title: "Export Complete",
       description: "HTML file exported successfully.",
     });
-  }, [content, toast]);
+  }, [content, pageSettings, blocks, uploadedFonts, toast]);
+
+  // Save Page (rendered HTML with embedded original markdown)
+  const handleSavePage = useCallback(() => {
+    // alias to exportHTML which already embeds original markdown via comment
+    handleExportHTML();
+  }, [handleExportHTML]);
 
   const handleExportPDF = useCallback(async () => {
     toast({
@@ -184,21 +334,55 @@ ${html}
 
     try {
       const html = renderMarkdown(content, true);
-      
+
+      const blockHtml = blocks
+          .map((block) => {
+          if (block.type === "heading") {
+            const Tag = `h${block.settings.level || 1}`;
+            const blockFont = (block.settings.direction === 'rtl') ? (block.settings.fontFamilyFa || block.settings.fontFamily) : (block.settings.fontFamilyEn || block.settings.fontFamily);
+            return `<${Tag} style="font-family: ${blockFont || 'Vazirmatn'}; font-size: ${block.settings.fontSize}px; color: ${block.settings.color}; background-color: ${block.settings.background}; font-weight: ${block.settings.bold ? 'bold' : 'normal'}; font-style: ${block.settings.italic ? 'italic' : 'normal'}; text-align: ${block.settings.alignment || 'left'};">${block.content}</${Tag}>`;
+          }
+          if (block.type === "paragraph") {
+            const paraFont = (block.settings.direction === 'rtl') ? (block.settings.fontFamilyFa || block.settings.fontFamily) : (block.settings.fontFamilyEn || block.settings.fontFamily);
+            return `<p style="font-family: ${paraFont || 'Vazirmatn'}; font-size: ${block.settings.fontSize}px; color: ${block.settings.color}; background-color: ${block.settings.background}; font-weight: ${block.settings.bold ? 'bold' : 'normal'}; font-style: ${block.settings.italic ? 'italic' : 'normal'}; text-align: ${block.settings.alignment || 'left'};">${block.content}</p>`;
+          }
+          if (block.type === "image") {
+            const w = block.settings.width ? `${block.settings.width}px` : 'auto';
+            const h = block.settings.height ? `${block.settings.height}px` : 'auto';
+            return `<div class="image-block" data-block-id="${block.id}" style="width: ${w}; height: ${h}; display:inline-block;"><img src="${block.src}" style="width:100%; height:100%; object-fit:contain;"/></div>`;
+          }
+          return '';
+        })
+        .join("\n");
+
+      const fontFaces = uploadedFonts
+        .map((f) => `@font-face { font-family: '${f.family || f.name}'; src: url('${f.url}'); font-display: swap; }`)
+        .join("\n");
+
       const container = document.createElement("div");
+
+      const padding = `${pageSettings.marginTop}px ${pageSettings.marginRight}px ${pageSettings.marginBottom}px ${pageSettings.marginLeft}px`;
+      const borderTop = pageSettings.border?.sides.includes('top') ? `${pageSettings.border.width}px ${pageSettings.border.style} ${pageSettings.border.color}` : 'none';
+      const borderBottom = pageSettings.border?.sides.includes('bottom') ? `${pageSettings.border.width}px ${pageSettings.border.style} ${pageSettings.border.color}` : 'none';
+      const borderLeft = pageSettings.border?.sides.includes('left') ? `${pageSettings.border.width}px ${pageSettings.border.style} ${pageSettings.border.color}` : 'none';
+      const borderRight = pageSettings.border?.sides.includes('right') ? `${pageSettings.border.width}px ${pageSettings.border.style} ${pageSettings.border.color}` : 'none';
+
       container.style.cssText = `
         position: fixed;
         left: -9999px;
         top: 0;
         width: 800px;
-        padding: 40px;
-        background: white;
-        font-family: 'Inter', 'Vazirmatn', system-ui, sans-serif;
-        line-height: 1.7;
-        color: #1a1a1a;
+        padding: 0;
+        background: ${pageSettings.background || 'white'};
+        font-family: '${pageSettings.fontFamilyEn || pageSettings.fontFamily}', '${pageSettings.fontFamilyFa || 'Vazirmatn'}', system-ui, sans-serif;
+        line-height: ${pageSettings.lineHeight};
+        color: ${pageSettings.color};
       `;
+
       container.innerHTML = `
         <style>
+          ${fontFaces}
+          #page { max-width: 800px; margin: 0 auto; padding: ${padding}; box-sizing: border-box; border-top: ${borderTop}; border-bottom: ${borderBottom}; border-left: ${borderLeft}; border-right: ${borderRight}; }
           h1, h2, h3, h4, h5, h6 { font-weight: 600; margin-top: 1.5em; margin-bottom: 0.5em; }
           h1 { font-size: 2rem; }
           h2 { font-size: 1.5rem; }
@@ -211,10 +395,21 @@ ${html}
           table { width: 100%; border-collapse: collapse; margin: 1em 0; }
           th, td { border: 1px solid #e0e0e0; padding: 0.5em 1em; text-align: left; }
           th { background: rgba(0,0,0,0.02); font-weight: 600; }
+          .image-block img { max-width: 100%; height: auto; border-radius: 8px; }
         </style>
-        ${html}
+        <div id="page">
+          ${html}
+          ${blockHtml}
+        </div>
       `;
+
       document.body.appendChild(container);
+
+      // Try to ensure uploaded fonts are loaded before rendering.
+      try {
+        await Promise.all(uploadedFonts.map(f => (document as any).fonts.load(`1em '${f.family || f.name}'`)));
+        await (document as any).fonts.ready;
+      } catch {}
 
       await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -295,7 +490,7 @@ ${html}
           <FileText className="w-5 h-5 text-primary" />
           <span className="font-semibold text-sm hidden sm:inline">AutoPersianType-Pro</span>
         </div>
-        
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" data-testid="menu-file">
@@ -313,7 +508,21 @@ ${html}
               Open
               <DropdownMenuShortcut>Ctrl+O</DropdownMenuShortcut>
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleIntro} data-testid="menu-file-intro">
+              <FileText className="mr-2 h-4 w-4" />
+              Introduction
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleSavePage} data-testid="menu-file-save-page">
+              <FileText className="mr-2 h-4 w-4" />
+              Save Page
+              <DropdownMenuShortcut>Ctrl+Shift+P</DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSaveMarkdown} data-testid="menu-file-save-md">
+              <FileText className="mr-2 h-4 w-4" />
+              Save Markdown
+              <DropdownMenuShortcut>Ctrl+Alt+S</DropdownMenuShortcut>
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={handleSave} data-testid="menu-file-save">
               <Save className="mr-2 h-4 w-4" />
               Save
@@ -423,11 +632,6 @@ ${html}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuItem onClick={toggleHeadingBuilder} data-testid="menu-tools-heading">
-              <FileText className="mr-2 h-4 w-4" />
-              Insert Heading
-            </DropdownMenuItem>
-
             <DropdownMenuItem onClick={toggleCodeBlockBuilder} data-testid="menu-tools-codeblock">
               <FileCode className="mr-2 h-4 w-4" />
               Insert Code Block
@@ -447,6 +651,10 @@ ${html}
               Document Outline
             </DropdownMenuItem>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={togglePageSettings} data-testid="menu-tools-page-settings">
+              <FileText className="mr-2 h-4 w-4" />
+              Page Settings
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={toggleSettings} data-testid="menu-tools-settings">
               <Settings className="mr-2 h-4 w-4" />
               Settings

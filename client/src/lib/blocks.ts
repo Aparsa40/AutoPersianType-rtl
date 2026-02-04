@@ -14,9 +14,14 @@ export interface BorderSettings {
 }
 
 export interface BlockSettings {
+  // legacy single fontFamily; prefer language-specific fields below
   fontFamily?: string;
+  fontFamilyFa?: string;
+  fontFamilyEn?: string;
   fontSize?: number;
   alignment?: "left" | "center" | "right";
+  // text direction for the block (used to choose language-specific fonts)
+  direction?: "ltr" | "rtl" | "mixed";
 
   /* heading */
   level?: 1 | 2 | 3 | 4 | 5 | 6;

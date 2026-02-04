@@ -1,9 +1,53 @@
+# Dependencies
 node_modules
+
+# Build output
 dist
+coverage
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Env files
+.env
+.env.*
+
+# OS
 .DS_Store
-server/public
-vite.config.ts.*
+
+# Temp / Cache
+.cache
+.temp
+.tmp
+.eslintcache
+
+# Archives
 *.tar.gz
 
-#VScode Tools
+# Server generated
+server/public
+
+# Vite config backups
+vite.config.ts.bak
+vite.config.ts.old
+
+# VS Code
+.vscode/luanch.json
+.vscode/extensions.json
+.settings.json
+.vscode/tasks.json
+.vscode/*.code-workspace
+.vscode/sync.lock
+.vscode/*.history/
+.vscode/
+
+
+# Workspaces
 AutoPersianType.code-workspace
+ParsSenseAutoPersianType.code-workspace
+#CopilotFiles
+github.copilot-1.388.0.vsix
+#workspaces
+.cursor/

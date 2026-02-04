@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -19,7 +20,6 @@ import {
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { useEditorStore } from "@/lib/store";
-import { fontFamilies } from "@shared/schema";
 
 export function SettingsPanel() {
   const { showSettings, toggleSettings, settings, setSettings } = useEditorStore();
@@ -35,80 +35,6 @@ export function SettingsPanel() {
         </SheetHeader>
 
         <div className="space-y-8">
-          <section>
-            <h3 className="text-sm font-medium mb-4 text-muted-foreground uppercase tracking-wide">
-              Font Settings
-            </h3>
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="font-family">Font Family</Label>
-                <Select
-                  value={settings.fontFamily}
-                  onValueChange={(value) => setSettings({ fontFamily: value })}
-                >
-                  <SelectTrigger id="font-family" data-testid="select-font-family">
-                    <SelectValue placeholder="Select font" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {fontFamilies.map((font) => (
-                      <SelectItem key={font.value} value={font.value}>
-                        <span style={{ fontFamily: font.value }}>{font.label}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="font-size">Font Size</Label>
-                  <span className="text-sm text-muted-foreground">{settings.fontSize}px</span>
-                </div>
-                <Slider
-                  id="font-size"
-                  min={10}
-                  max={32}
-                  step={1}
-                  value={[settings.fontSize]}
-                  onValueChange={([value]) => setSettings({ fontSize: value })}
-                  data-testid="slider-font-size"
-                />
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="line-height">Line Height</Label>
-                  <span className="text-sm text-muted-foreground">{settings.lineHeight.toFixed(1)}</span>
-                </div>
-                <Slider
-                  id="line-height"
-                  min={1}
-                  max={3}
-                  step={0.1}
-                  value={[settings.lineHeight]}
-                  onValueChange={([value]) => setSettings({ lineHeight: value })}
-                  data-testid="slider-line-height"
-                />
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="tab-size">Tab Size</Label>
-                  <span className="text-sm text-muted-foreground">{settings.tabSize} spaces</span>
-                </div>
-                <Slider
-                  id="tab-size"
-                  min={2}
-                  max={8}
-                  step={1}
-                  value={[settings.tabSize]}
-                  onValueChange={([value]) => setSettings({ tabSize: value })}
-                  data-testid="slider-tab-size"
-                />
-              </div>
-            </div>
-          </section>
-
           <Separator />
 
           <section>

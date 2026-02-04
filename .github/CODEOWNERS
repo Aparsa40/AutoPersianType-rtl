@@ -6,11 +6,11 @@
 
  ## Protect server and build config
 
-/server/ @your-github-username
-/package.json @your-github-username
-drizzle.config.ts @your-github-username
-vite.config.ts @your-github-username
+/server/ @Aparsa40
+/package.json @Aparsa40
+drizzle.config.ts @Aparsa40
+vite.config.ts @Aparsa40
 
  # General ownership for docs and src (optional)
 
-/client/ @your-github-username
+/client/ @Aparsa40

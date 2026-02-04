@@ -1,48 +1,54 @@
-const rtlChars = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/;
-const ltrChars = /[A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02B8]/;
+const persianWord = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+const latinWord = /[A-Za-z\u00C0-\u00FF0-9]/;
 
+// Detect the overall text direction of a document-ish string. This returns
+// "ltr"|"rtl"|"mixed" but is conservative — used mainly for summaries.
 export function detectTextDirection(text: string): "ltr" | "rtl" | "mixed" {
-  if (!text || text.trim().length === 0) {
-    return "ltr";
+  if (!text || text.trim().length === 0) return "ltr";
+
+  // coarse word-based counts rather than per-character heuristics.
+  const words = text.split(/\s+/).filter(Boolean);
+  let persian = 0;
+  let latin = 0;
+  for (const w of words) {
+    if (persianWord.test(w)) persian++;
+    else if (latinWord.test(w)) latin++;
   }
 
-  const cleanText = text.replace(/[\s\d.,!?;:'"()\[\]{}<>@#$%^&*+=\-_\/\\|~`]/g, "");
-  
-  if (cleanText.length === 0) {
-    return "ltr";
-  }
-
-  let rtlCount = 0;
-  let ltrCount = 0;
-
-  for (const char of cleanText) {
-    if (rtlChars.test(char)) {
-      rtlCount++;
-    } else if (ltrChars.test(char)) {
-      ltrCount++;
-    }
-  }
-
-  const total = rtlCount + ltrCount;
+  const total = persian + latin;
   if (total === 0) return "ltr";
-
-  const rtlRatio = rtlCount / total;
-  const ltrRatio = ltrCount / total;
-
-  if (rtlRatio > 0.7) return "rtl";
-  if (ltrRatio > 0.7) return "ltr";
+  if (persian / total > 0.6) return "rtl";
+  if (latin / total > 0.6) return "ltr";
   return "mixed";
 }
 
+// Detect the paragraph/line direction in a semantic way: count words that
+// look Persian vs words that look Latin. Persian dominance forces RTL; a
+// single inline English word inside Persian paragraph will not flip the
+// paragraph direction because we operate at word-level dominance.
 export function detectParagraphDirection(text: string): "ltr" | "rtl" {
-  const trimmed = text.trim();
+  const trimmed = (text || "").trim();
   if (!trimmed) return "ltr";
 
-  for (const char of trimmed) {
-    if (rtlChars.test(char)) return "rtl";
-    if (ltrChars.test(char)) return "ltr";
+    // split on any run of characters that are not latin/persian letters, digits or underscore
+    const words = trimmed.split(/[^A-Za-z0-9_\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+/).filter(Boolean);
+  let persian = 0;
+  let latin = 0;
+  for (const w of words) {
+    if (persianWord.test(w)) persian++;
+    else if (latinWord.test(w)) latin++;
   }
 
+  if (persian === 0 && latin === 0) {
+    // fallback to scanning any character for direction
+    for (const ch of trimmed) {
+      if (persianWord.test(ch)) return "rtl";
+      if (latinWord.test(ch)) return "ltr";
+    }
+    return "ltr";
+  }
+
+  if (persian > latin) return "rtl";
   return "ltr";
 }
 
@@ -58,19 +64,14 @@ export function getDirectionStyles(direction: "ltr" | "rtl"): {
 
 export function wrapParagraphsWithDirection(html: string, autoDirection: boolean): string {
   if (!autoDirection) return html;
-
   const tempDiv = document.createElement("div");
   tempDiv.innerHTML = html;
-
   const blockElements = tempDiv.querySelectorAll("p, h1, h2, h3, h4, h5, h6, li, blockquote");
-
   blockElements.forEach((element) => {
     const text = element.textContent || "";
     const direction = detectParagraphDirection(text);
-    (element as HTMLElement).style.direction = direction;
-    (element as HTMLElement).style.textAlign = direction === "rtl" ? "right" : "left";
+    try { element.setAttribute('dir', direction); } catch {}
   });
-
   return tempDiv.innerHTML;
 }
 
@@ -113,7 +114,7 @@ export function extractHeadings(content: string): Array<{
 
 export function countWords(text: string): number {
   if (!text.trim()) return 0;
-  
+
   const cleanText = text
     .replace(/```[\s\S]*?```/g, "")
     .replace(/`[^`]+`/g, "")

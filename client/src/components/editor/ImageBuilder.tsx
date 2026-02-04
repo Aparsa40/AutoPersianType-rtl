@@ -52,6 +52,16 @@ export function ImageBuilder() {
       },
     };
     addBlock(block);
+
+    // Insert an inline markdown image into the editor at the cursor so the
+    // image is included in exported markdown as well.
+    try {
+      const md = `\n\n![image-${block.id}](${src})\n\n`;
+      (window as any).insertTextAtCursor?.(md);
+    } catch (err) {
+      // ignore if editor helper isn't available
+    }
+
     toggleImageBuilder();
   };
 

@@ -6,6 +6,8 @@ export const documentSchema = z.object({
   content: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  // Optional page-level settings saved with the document (keeps export and view consistent)
+  pageSettings: z.record(z.any()).optional(),
 });
 
 export const insertDocumentSchema = documentSchema.omit({ id: true, createdAt: true, updatedAt: true });
@@ -72,3 +74,45 @@ export const fontFamilies = [
   { value: "IBM Plex Mono", label: "IBM Plex Mono", type: "mono" },
   { value: "Roboto Mono", label: "Roboto Mono", type: "mono" },
 ] as const;
+
+export const pageSettingsSchema = z.object({
+  // legacy single fontFamily kept for compatibility; prefer separate fa/en fields
+  fontFamily: z.string().default("Vazirmatn"),
+  // language-specific fonts
+  fontFamilyFa: z.string().default("Vazirmatn"),
+  fontFamilyEn: z.string().default("Inter"),
+  fontSize: z.number().min(8).max(48).default(16),
+  color: z.string().default("#1a1a1a"),
+  background: z.string().nullable().default("#ffffff"),
+  lineHeight: z.number().min(1).max(3).default(1.7),
+  marginTop: z.number().min(0).default(40),
+  marginBottom: z.number().min(0).default(40),
+  marginLeft: z.number().min(0).default(40),
+  marginRight: z.number().min(0).default(40),
+  border: z
+    .object({
+      sides: z.array(z.enum(["top", "right", "bottom", "left"])),
+      width: z.number().min(0).default(0),
+      style: z.enum(["solid", "dashed", "dotted"]).default("solid"),
+      color: z.string().default("#000000"),
+    })
+    .nullable()
+    .default(null),
+});
+
+export type PageSettings = z.infer<typeof pageSettingsSchema>;
+
+export const defaultPageSettings: PageSettings = {
+  fontFamily: "Vazirmatn",
+  fontFamilyFa: "Vazirmatn",
+  fontFamilyEn: "Inter",
+  fontSize: 16,
+  color: "#1a1a1a",
+  background: "#ffffff",
+  lineHeight: 1.7,
+  marginTop: 40,
+  marginBottom: 40,
+  marginLeft: 40,
+  marginRight: 40,
+  border: null,
+};

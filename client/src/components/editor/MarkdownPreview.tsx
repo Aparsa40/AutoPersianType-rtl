@@ -1,50 +1,66 @@
-import { useMemo, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import { useEditorStore } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { renderMarkdown, getMarkdownStyles } from "@/lib/markdown";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function MarkdownPreview() {
-  const { content, blocks, theme, settings, cursorPosition, setPreviewScrollPercent, editorScrollPercent, editorCenterLine, setPreviewCenterLine } = useEditorStore();
+  const { content, blocks, theme, settings, pageSettings, cursorPosition, setPreviewScrollPercent, editorScrollPercent, editorCenterLine, setPreviewCenterLine } = useEditorStore();
   const previewRef = useRef<HTMLDivElement>(null);
   const isSettingScroll = useRef(false);
   const { toast } = useToast();
 
   const html = useMemo(() => {
+
     const blockHtml = blocks.map(block => {
-      if (block.type === "heading") {
-        const Tag = `h${block.settings.level || 1}` as any;
-        return `<${Tag} style="
-          font-family: ${block.settings.fontFamily || 'Vazirmatn'};
-          font-size: ${block.settings.fontSize}px;
-          color: ${block.settings.color};
-          background-color: ${block.settings.background};
-          font-weight: ${block.settings.bold ? 'bold' : 'normal'};
-          font-style: ${block.settings.italic ? 'italic' : 'normal'};
-          text-align: ${block.settings.alignment || 'left'};
-          border-top: ${block.settings.border?.sides.includes('top') ? block.settings.border.width+'px '+block.settings.border.style+' '+block.settings.border.color : 'none'};
-          border-bottom: ${block.settings.border?.sides.includes('bottom') ? block.settings.border.width+'px '+block.settings.border.style+' '+block.settings.border.color : 'none'};
-        ">${block.content}</${Tag}>`;
-      }
+      try {
+        const rendered = renderMarkdown(block.content || "");
+        const blockFont = (block.settings.direction === 'rtl') ? (block.settings.fontFamilyFa || block.settings.fontFamily) : (block.settings.fontFamilyEn || block.settings.fontFamily);
 
-      if (block.type === "image") {
-        const w = block.settings.width ? `${block.settings.width}px` : 'auto';
-        const h = block.settings.height ? `${block.settings.height}px` : 'auto';
-        const left = typeof block.settings.x === 'number' ? `left:${block.settings.x}px;position:absolute;` : '';
-        const top = typeof block.settings.y === 'number' ? `top:${block.settings.y}px;position:absolute;` : '';
-        const bgRemoved = block.settings.backgroundRemoved ? 'data-bg-removed="true"' : '';
-        return `<div class="image-block" data-block-id="${block.id}" ${bgRemoved} style="position:relative; ${left} ${top} width: ${w}; height: ${h}; display:inline-block;">
-          <img src="${block.src}" style="width:100%; height:100%; object-fit:contain; user-select:none; -webkit-user-drag:none;" draggable="false" />
-        </div>`;
-      }
+        const style = `font-family: ${blockFont || 'Vazirmatn'}; font-size: ${block.settings.fontSize}px; color: ${block.settings.color}; background-color: ${block.settings.background || 'transparent'}; font-weight: ${block.settings.bold ? 'bold' : 'normal'}; font-style: ${block.settings.italic ? 'italic' : 'normal'}; text-align: ${block.settings.alignment || 'left'};`;
 
-      return '';
+        if (block.type === 'image') {
+          const w = block.settings.width ? `${block.settings.width}px` : 'auto';
+          const h = block.settings.height ? `${block.settings.height}px` : 'auto';
+          const left = typeof block.settings.x === 'number' ? `left:${block.settings.x}px;position:absolute;` : '';
+          const top = typeof block.settings.y === 'number' ? `top:${block.settings.y}px;position:absolute;` : '';
+          const bgRemoved = block.settings.backgroundRemoved ? 'data-bg-removed="true"' : '';
+          return `<div class="image-block" data-block-id="${block.id}" ${bgRemoved} style="position:relative; ${left} ${top} width: ${w}; height: ${h}; display:inline-block;">
+            <img src="${block.src}" style="width:100%; height:100%; object-fit:contain; user-select:none; -webkit-user-drag:none;" draggable="false" />
+          </div>`;
+        }
+
+        return `<div class="block" data-block-id="${block.id}" style="${style}">${rendered}</div>`;
+      } catch (e) {
+        return '';
+      }
     }).join("\n");
 
-    return renderMarkdown(content) + blockHtml;
+    return renderMarkdown(content);
   }, [content, blocks]);
 
   const styles = useMemo(() => getMarkdownStyles(theme), [theme]);
+
+  const pageLevelStyles = useMemo(() => {
+    try {
+      const fa = pageSettings.fontFamilyFa || pageSettings.fontFamily || 'Vazirmatn';
+      const en = pageSettings.fontFamilyEn || pageSettings.fontFamily || 'Inter';
+      return `
+        /* document-level font and language mapping */
+        .markdown-preview { font-family: '${en}', system-ui, sans-serif; line-height: ${pageSettings.lineHeight}; }
+        .markdown-preview [dir="rtl"] { font-family: '${fa}', system-ui, sans-serif; }
+        .markdown-preview [dir="ltr"] { font-family: '${en}', system-ui, sans-serif; }
+        .markdown-preview [dir="rtl"] { text-align: right; }
+        .markdown-preview [dir="ltr"] { text-align: left; }
+        /* ensure code blocks keep monospace */
+        .markdown-preview code, .markdown-preview pre { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+      `;
+    } catch {
+      return '';
+    }
+  }, [pageSettings.fontFamily, pageSettings.fontFamilyEn, pageSettings.fontFamilyFa]);
+
+  const [showSource, setShowSource] = useState(false);
 
   useEffect(() => {
     if (previewRef.current) {
@@ -52,8 +68,154 @@ export function MarkdownPreview() {
         link.setAttribute("target", "_blank");
         link.setAttribute("rel", "noopener noreferrer");
       });
+
+      // Handle embedded demos (created by renderMarkdown placeholders)
+      const embeds = previewRef.current.querySelectorAll('.embedded-demo');
+      embeds.forEach((el) => {
+        try {
+          const lang = (el as HTMLElement).getAttribute('data-lang') || 'html';
+          const payload = (el as HTMLElement).getAttribute('data-content') || '';
+          if (!payload) return;
+          const src = decodeURIComponent(escape(atob(payload)));
+
+          // create iframe container
+          const iframe = document.createElement('iframe');
+          iframe.setAttribute('sandbox', 'allow-scripts');
+          iframe.style.width = '100%';
+          iframe.style.border = '1px solid var(--border)';
+          iframe.style.borderRadius = '8px';
+          iframe.style.minHeight = '120px';
+          iframe.style.display = 'block';
+          iframe.style.overflow = 'auto';
+
+          // prepare srcdoc depending on language
+          let doc = '';
+          if (lang === 'html') {
+            doc = src;
+          } else if (lang === 'css') {
+            doc = `<!doctype html><html><head><meta charset="utf-8"><style>${src}</style></head><body><div class="demo">Example content to preview CSS</div></body></html>`;
+          } else { // js / javascript
+            doc = `<!doctype html><html><head><meta charset="utf-8"></head><body><div id="out"></div><script>try{${src}}catch(e){document.body.innerHTML='<pre style="color:red">'+(e&&e.message||e)+'</pre>'}</script></body></html>`;
+          }
+
+          // set srcdoc via blob URL to avoid srcdoc sanitizer issues and allow scripts
+          try {
+            const blob = new Blob([doc], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            iframe.src = url;
+            // cleanup blob URL on unload later
+            (iframe as any).__blobUrl = url;
+          } catch (e) {
+            // fallback to srcdoc
+            try { iframe.setAttribute('srcdoc', doc); } catch {}
+          }
+
+          // replace placeholder with iframe
+          el.replaceWith(iframe);
+        } catch (e) {
+          // ignore per-item errors
+        }
+      });
+
+      // cleanup blob urls on unmount
+      // add copy handler so copying from preview yields Markdown source
+      const copyHandler = (ev: ClipboardEvent) => {
+        try {
+          const sel = window.getSelection();
+          if (!sel || sel.isCollapsed) return;
+          const range = sel.getRangeAt(0);
+          const root = previewRef.current as HTMLElement;
+          const nodes = Array.from(root.querySelectorAll('[data-source-line]')) as HTMLElement[];
+          const linesFound: number[] = [];
+          nodes.forEach((n) => {
+            try {
+              if (range.intersectsNode(n)) {
+                const v = Number(n.getAttribute('data-source-line') || 0);
+                if (v) linesFound.push(v);
+              }
+            } catch {}
+          });
+
+          let md = '';
+          const all = (content || '').split('\n');
+          if (linesFound.length) {
+            const min = Math.max(1, Math.min(...linesFound));
+            const max = Math.max(...linesFound);
+            md = all.slice(min - 1, max).join('\n');
+          } else {
+            // fallback: copy entire source when selection can't be mapped
+            md = content || '';
+          }
+
+          if (!md) return;
+          ev.preventDefault();
+          if (ev.clipboardData) {
+            ev.clipboardData.setData('text/plain', md);
+            try { ev.clipboardData.setData('text/markdown', md); } catch {}
+          } else {
+            try { navigator.clipboard.writeText(md); } catch {}
+          }
+          toast({ title: 'Copied Markdown' });
+        } catch (e) {
+          // swallow
+        }
+      };
+
+      try { previewRef.current.addEventListener('copy', copyHandler as any); } catch {}
+
+      return () => {
+        const iframes = previewRef.current?.querySelectorAll('iframe');
+        if (iframes) {
+          iframes.forEach((f) => { try { const url = (f as any).__blobUrl; if (url) URL.revokeObjectURL(url); } catch {} });
+        }
+        try { previewRef.current?.removeEventListener('copy', copyHandler as any); } catch {}
+      };
     }
   }, [html]);
+
+  // context menu + source toggle for preview
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el) return;
+    let menuEl: HTMLElement | null = null;
+    const removeMenu = () => { if (menuEl) { menuEl.remove(); menuEl = null; } };
+    const onDocClick = () => removeMenu();
+    document.addEventListener('click', onDocClick);
+
+    const onContext = (e: MouseEvent) => {
+      e.preventDefault();
+      removeMenu();
+      const menu = document.createElement('div');
+      menu.className = 'preview-context-menu p-2 bg-popover border rounded shadow';
+      menu.style.position = 'fixed';
+      menu.style.left = e.clientX + 'px';
+      menu.style.top = e.clientY + 'px';
+      menu.style.zIndex = '9999';
+
+      const btn = (text: string, cb: () => void) => {
+        const b = document.createElement('button');
+        b.className = 'block w-full text-sm text-left px-2 py-1 hover:bg-accent/10';
+        b.textContent = text;
+        b.addEventListener('click', () => { cb(); removeMenu(); });
+        menu.appendChild(b);
+      };
+
+      btn('Copy as Markdown', async () => { try { await navigator.clipboard.writeText(content); toast({ title: 'Copied Markdown' }); } catch { toast({ title: 'Copy failed' }); } });
+      btn('Copy as HTML', async () => { try { await navigator.clipboard.writeText(el.innerHTML); toast({ title: 'Copied HTML' }); } catch { toast({ title: 'Copy failed' }); } });
+      btn(showSource ? 'Show Rendered' : 'Show Source', () => setShowSource(s => !s));
+
+      document.body.appendChild(menu);
+      menuEl = menu;
+    };
+
+    el.addEventListener('contextmenu', onContext as EventListener);
+
+    return () => {
+      removeMenu();
+      document.removeEventListener('click', onDocClick);
+      try { el.removeEventListener('contextmenu', onContext as EventListener); } catch {}
+    };
+  }, [content, showSource, toast]);
 
   // scroll sync: preview -> store
   useEffect(() => {
@@ -295,21 +457,46 @@ export function MarkdownPreview() {
     };
   }, [html, blocks, toast]);
 
+  const outerBorderStyle: any = {};
+  if (pageSettings.border && pageSettings.border.width && pageSettings.border.sides && pageSettings.border.sides.length) {
+    const b = pageSettings.border;
+    outerBorderStyle.borderTop = b.sides.includes('top') ? `${b.width}px ${b.style} ${b.color}` : undefined;
+    outerBorderStyle.borderBottom = b.sides.includes('bottom') ? `${b.width}px ${b.style} ${b.color}` : undefined;
+    outerBorderStyle.borderLeft = b.sides.includes('left') ? `${b.width}px ${b.style} ${b.color}` : undefined;
+    outerBorderStyle.borderRight = b.sides.includes('right') ? `${b.width}px ${b.style} ${b.color}` : undefined;
+  }
+
   return (
-    <div className="h-full w-full flex flex-col" data-testid="markdown-preview-container">
-      <style>{styles}</style>
-      <ScrollArea className="flex-1">
+    <div className="h-full w-full flex flex-col" data-testid="markdown-preview-container" style={{ ...outerBorderStyle }}>
+      <style>{styles + pageLevelStyles}</style>
+      <ScrollArea className="flex-1" style={{ background: pageSettings.background || undefined }}>
         <div
           ref={previewRef}
-          className="markdown-preview p-8"
+          className="markdown-preview"
           style={{
-            fontFamily: `'Inter', 'Vazirmatn', system-ui, sans-serif`,
-            fontSize: settings.fontSize,
-            lineHeight: settings.lineHeight,
+            minHeight: '100%',
+            fontSize: `${pageSettings.fontSize}px`,
+            color: pageSettings.color,
+            background: pageSettings.background || undefined,
+            paddingTop: pageSettings.marginTop,
+            paddingBottom: pageSettings.marginBottom,
+            paddingLeft: pageSettings.marginLeft,
+            paddingRight: pageSettings.marginRight,
+            boxSizing: 'border-box',
           }}
-          dangerouslySetInnerHTML={{ __html: html }}
           data-testid="markdown-preview-content"
-        />
+        >
+          {showSource ? (
+            <textarea
+              value={content}
+              onChange={(e) => useEditorStore.getState().setContent(e.target.value)}
+              className="w-full h-full bg-transparent text-sm p-4"
+              style={{ minHeight: '200px', resize: 'vertical' }}
+            />
+          ) : (
+            <div dangerouslySetInnerHTML={{ __html: html }} />
+          )}
+        </div>
       </ScrollArea>
     </div>
   );

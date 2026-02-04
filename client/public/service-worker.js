@@ -8,7 +8,9 @@ const RUNTIME_CACHE = 'AutoPersianType-runtime-v1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/manifest.webmanifest'
+  '/manifest.json',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png'
 ];
 
 // --------------------
